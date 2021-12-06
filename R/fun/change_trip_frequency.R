@@ -13,9 +13,9 @@ library(gtfstools) # install.packages('gtfstools')
 # 1) Fortaleza - metro linha leste ex-ante ---------------------------------------------------
 
 # gtfs <- "../../data-raw/avaliacao_intervencoes/for/gtfs_for_metrofor_2021-01.zip"
-gtfs <- "../../data-raw/avaliacao_intervencoes/for/gtfs/gtfs_for_etufor_2019-10.zip"
+# gtfs <- "../../data-raw/avaliacao_intervencoes/for/gtfs/gtfs_for_etufor_2019-10.zip"
 # lines to be changed frequency
-gtfs <- read_gtfs(gtfs)
+# gtfs <- read_gtfs(gtfs)
 
 # identify lines to change frequency
 # routes_metrofor <- gtfs$routes %>% select(route_id, route_long_name)
@@ -51,7 +51,7 @@ change_trip_frequency <- function(gtfs, routes, new_freqs, services) {
   trips <- gtfs$trips
   # ATENCAO: para o caso de Fortaleza ETUFOR, a informacao de direction_id teve que ser
   # extraida a partir do trip_id
-  trips[, direction_id := fifelse(stringr::str_sub(trip_id, -1, -1) == "I", 0, 1)]
+  # trips[, direction_id := fifelse(stringr::str_sub(trip_id, -1, -1) == "I", 0, 1)]
   # get stoptimes
   stop_times <- gtfs$stop_times
   

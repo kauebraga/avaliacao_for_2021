@@ -11,9 +11,10 @@ source("R/fun/crop_line_btw_points.R")
 
 
 
+
 # 1) Fortaleza - metro linha leste ex-ante ---------------------------------------------------
 
-gtfs <- "../../data-raw/avaliacao_intervencoes/for/gtfs_for_metrofor_2021-01.zip"
+gtfs <- "data-raw/gtfs/gtfs_for_metrofor_2021-01.zip"
 
 
 # open tables - they are in a spreadsheet
@@ -35,7 +36,7 @@ routes_df <- read_sheet("https://docs.google.com/spreadsheets/d/1vhz_cV1rRj6aKPp
 
 
 # open lines
-line_shape <- st_read("../../data-raw/avaliacao_intervencoes/for/linha_leste_kaue_gearth.gpkg") %>%
+line_shape <- st_read("data-raw/linha_leste_kaue_gearth.gpkg") %>%
   # identify route and direction
   mutate(route_id = "LL", 
          direction_id = 0) %>%
@@ -87,21 +88,22 @@ metrofor_new_frequency <- data.frame(
 gtfs_metrofor_new <- change_trip_frequency(a, 
                                            routes = metrofor_new_frequency$route_id, 
                                            new_freqs = metrofor_new_frequency$frequency,
-                                           services = "")
+                                           services = "4")
 
 
 # export gtfs
-gtfstools::write_gtfs(a, path = "../../data/avaliacao_intervencoes/for/gtfs/gtfs_for_metrofor_2021-01_depois.zip")
+if (!dir.exists("data/gtfs"))  dir.create("data/gtfs")
+gtfstools::write_gtfs(a, path = "data/gtfs/gtfs_for_metrofor_2021-01_depois.zip")
 
 
 
 # change frequency of lines - etufor ------------------
 
 # Open gtfs
-gtfs_etufor <- read_gtfs("../../data-raw/avaliacao_intervencoes/for/gtfs/gtfs_for_etufor_2019-10.zip")
+gtfs_etufor <- read_gtfs("data-raw/gtfs/gtfs_for_etufor_2019-10.zip")
 
 # open data with the new frequencies
-linhas_mudancas <- fread("../../data/avaliacao_intervencoes/for/etufor_linhas_mudancas.csv",
+linhas_mudancas <- fread("data-raw/etufor_linhas_mudancas.csv",
                          colClasses = "character")
 # pegar somente linhas que nao vao ser excluidas
 table(linhas_mudancas$parecer, useNA = 'always')
@@ -128,121 +130,10 @@ gtfs_etufor_new <- gtfstools::filter_route_id(gtfs_etufor_new,
 
 
 # export gtfs
-gtfstools::write_gtfs(gtfs_etufor_new, path = "../../data/avaliacao_intervencoes/for/gtfs/gtfs_for_etufor_2019-10_depois.zip")
+gtfstools::write_gtfs(gtfs_etufor_new, path = "data/gtfs/gtfs_for_etufor_2019-10_depois.zip")
 
 
 
 
 
 
-
-# 2) Goiania -  ---------------------------------------------------
-
-
-
-gtfs <- "../../data-raw/gtfs/goi/2019/gtfs_goi_rmtc_2019-10.zip"
-
-gsheet <- "https://docs.google.com/spreadsheets/d/143Q6JuMsfvfYIruB4RzopnnJ22nOrD7fyKnQEgAjCaU/edit#gid=1999921628"
-
-
-# open tables - they are in a spreadsheet
-headways_df <- read_sheet(gsheet,
-                          sheet = "headways_df", skip = 11) %>% setDT()
-
-
-
-ttime_df <- read_sheet(gsheet,
-                       sheet = "ttime_df_mod", skip = 11) %>% setDT()
-
-
-stops_df <- read_sheet(gsheet,
-                       sheet = "stops_df_mod", skip = 11) %>% setDT()
-
-
-routes_df <- read_sheet(gsheet,
-                        sheet = "routes_df", skip = 11) %>% setDT()
-
-
-# 006 -> T001 -  ENS19B
-# 007 -> T002 -  ENS19B
-# 013 -> ENS19A -  ENS40
-
-# open lines
-line_shape <- st_read("../../data-raw/avaliacao_intervencoes/goi/Corredor_BRT.gpkg") %>%
-  st_cast("POINT") %>%
-  slice(1:152) %>%
-  group_by(Name) %>%
-  summarise(do_union = FALSE) %>%
-  st_cast("LINESTRING")
-
-points_routes <- list(
-  points_006 = stops_df %>%
-    filter(stop_id %in% c("T001", "T004A")) %>%
-    st_as_sf(coords = c("stop_lon", "stop_lat"), crs = 4326) %>%
-    mutate(route_id = "BRT_006"),
-  points_007 = stops_df %>%
-    filter(stop_id %in% c("T002", "ENS19B")) %>%
-    st_as_sf(coords = c("stop_lon", "stop_lat"), crs = 4326) %>%
-    mutate(route_id = "BRT_007"),
-  points_013 = stops_df %>%
-    filter(stop_id %in% c("ENS19A", "T006")) %>%
-    st_as_sf(coords = c("stop_lon", "stop_lat"), crs = 4326) %>%
-    mutate(route_id = "BRT_013"))
-
-# temos que quebrar o shape para cada linha
-break_routes_goi <- function(stops, line) {
-  
-  a <- crop_line_btw_points(line = line, points = stops)
-  a <- a %>%   mutate(route_id = unique(stops$route_id), 
-                      direction_id = 1) %>%
-    select(route_id, direction_id)
-  
-  # invert
-  a0 <- st_reverse(a) %>% mutate(direction_id = 0)
-  
-  # bind
-  a_fim <- rbind(a0, a)
-  
-}
-
-
-line_shape_routes <- lapply(points_routes, FUN = break_routes_goi, line_shape) %>%
-  rbindlist() %>% st_sf()
-
-# st_write(line_shape_routes, "linhas_goi.gpkg")
-
-
-# a <- st_read(("../../data-raw/avaliacao_intervencoes/goi/goi_paradas_brt_nomeados.gpkg")) %>% st_zm()
-
-# oi %>% filter(route_id == "BRT_013") %>% mapview() + a
-
-
-# apply function to create the new gtfs and merge to the original one
-purrr::walk(list.files("R/fun", full.names = TRUE), source)
-
-a <- create_merge_gtfs(gtfs = gtfs,
-                       headways_df = headways_df,
-                       ttime_df = ttime_df,
-                       stops_df = stops_df,
-                       routes_df = routes_df,
-                       line_shape = line_shape_routes,
-                       service_id = "weekdays",
-                       stops_crs = 4326
-)
-
-# lines to be deleated
-gtfs_original <- read_gtfs(gtfs)
-routes_delete1 <- gtfs_original$routes[route_id %like% "006|007|013"]$route_id # thenew lines 
-routes_delete2 <- gtfs_original$routes[route_id %like% "107|600|611"]$route_id # excluded
-
-# delete them
-a_delete_lines <- gtfstools::filter_route_id(a,
-                                             route_ids = c(routes_delete1, routes_delete2),
-                                             keep = FALSE)
-
-# a_delete_lines$trips %>% View()
-# a_delete_lines$stop_times %>% View()
-
-
-# export gtfs
-gtfstools::write_gtfs(a_delete_lines, path = "../../data/avaliacao_intervencoes/goi/gtfs_goi_rmtc_2019-10_depois.zip")
